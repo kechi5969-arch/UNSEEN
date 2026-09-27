@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>地図にない場所 - 地下鉄プロトタイプ</title>
+<style>
+*{box-sizing:border-box} body{margin:0;background:#050608;color:#eee;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}
+#game{height:100vh;position:relative;background:radial-gradient(circle at 50% 45%,#222 0,#0c0d0f 38%,#030405 100%)}
+#hud{position:absolute;top:0;left:0;right:0;padding:12px 16px;display:flex;justify-content:space-between;z-index:5;text-shadow:0 2px 4px #000}
+.badge{background:#111b;border:1px solid #555;border-radius:8px;padding:7px 10px}
+#danger{position:absolute;top:62px;left:50%;transform:translateX(-50%);padding:7px 18px;border-radius:20px;background:#163b25;border:1px solid #3a7}
+#world{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#station{position:relative;width:min(900px,92vw);height:min(520px,70vh);border:2px solid #444;background:
+linear-gradient(90deg,transparent 49.6%,#333 49.6%,#333 50.4%,transparent 50.4%),
+linear-gradient(#17191b,#0b0c0e);box-shadow:0 0 50px #000 inset}
+.platform{position:absolute;left:5%;right:5%;height:90px;background:#282b2e;border-top:4px solid #555;border-bottom:4px solid #111}
+.p1{top:18%}.p2{bottom:18%}
+.rail{position:absolute;left:8%;right:8%;height:10px;background:#777;box-shadow:0 18px #555}.r1{top:43%}.r2{top:55%}
+#player{position:absolute;width:26px;height:26px;border-radius:50%;background:#bde;box-shadow:0 0 16px #9cf;z-index:3;transition:.08s}
+.obj{position:absolute;font-size:27px;cursor:pointer;filter:drop-shadow(0 0 7px #fff8);z-index:2}
+#monster{position:absolute;width:34px;height:55px;border-radius:50% 50% 35% 35%;background:#050505;box-shadow:0 0 18px #a00;display:none;z-index:4}
+#monster:after{content:"••";position:absolute;color:#f33;font-size:22px;left:8px;top:8px;letter-spacing:7px}
+#message{position:absolute;bottom:95px;left:50%;transform:translateX(-50%);background:#000d;border:1px solid #555;border-radius:10px;padding:10px 16px;opacity:0;transition:.2s;z-index:6}
+#controls{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:7}
+button{background:#15181b;color:#fff;border:1px solid #777;border-radius:9px;padding:11px 15px;font-size:15px}
+button:active{transform:scale(.96)} #start,#result{position:absolute;inset:0;background:#050608f5;z-index:20;display:flex;align-items:center;justify-content:center;text-align:center}
+.panel{width:min(560px,90vw);padding:28px;border:1px solid #555;border-radius:16px;background:#111419;box-shadow:0 20px 80px #000}
+h1{font-size:30px;margin:0 0 8px}.sub{color:#aaa;line-height:1.7}.big{font-size:46px;margin:15px}.hidden{display:none!important}
+#cameraFlash{position:absolute;inset:0;background:white;opacity:0;z-index:15;pointer-events:none}
+@media(max-width:600px){#station{height:62vh}.badge{font-size:13px}.platform{height:70px}#controls{flex-wrap:wrap;width:95%;justify-content:center}button{padding:10px 12px}}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="hud">
+    <div class="badge">残り時間 <b id="time">15:00</b></div>
+    <div class="badge">暫定 <b id="score">0</b> pt</div>
+  </div>
+  <div id="danger">🟢 普通　倍率 ×1</div>
+  <div id="world">
+    <div id="station">
+      <div class="platform p1"></div><div class="platform p2"></div>
+      <div class="rail r1"></div><div class="rail r2"></div>
+      <div id="player"></div><div id="monster"></div>
+      <div class="obj" id="part" title="部品">🔧</div>
+      <div class="obj" id="anomaly" title="異常">⚠️</div>
+      <div class="obj" id="photo" title="写真対象">📷</div>
+      <div class="obj" id="phenomenon" title="現象">👁️</div>
+      <div class="obj" id="exit" title="脱出地点">🚇</div>
+    </div>
+  </div>
+  <div id="message"></div>
+  <div id="controls">
+    <button data-k="up">↑</button><button data-k="left">←</button><button data-k="down">↓</button><button data-k="right">→</button>
+    <button id="shoot">📷 撮影</button><button id="escape">🚇 脱出</button>
+  </div>
+  <div id="cameraFlash"></div>
+  <div id="start"><div class="panel">
+    <h1>地図にない場所</h1>
+    <div class="sub">🚇 地図にない地下鉄 — プロトタイプ<br><br>
+    調査してポイントを稼ぎ、危険になる前に帰還しよう。<br>
+    <b>死亡すると今回のポイントは0。</b></div>
+    <br><button id="startBtn">調査を開始</button>
+  </div></div>
+  <div id="result" class="hidden"><div class="panel">
+    <h1 id="resultTitle">🏆 調査結果</h1>
+    <div class="big" id="finalScore">0 pt</div>
+    <div id="stats"></div><br>
+    <button id="retry">もう一度調査</button>
+  </div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let running=false,dead=false,score=0,time=900,last=0,shot=0,found=0,photos=0;
+let p={x:50,y:50}, m={x:75,y:28}, objs={};
+const station=$('station');
+const positions={part:[18,25],anomaly:[75,22],photo:[28,73],phenomenon:[72,70],exit:[50,87]};
+function reset(){
+  running=false;dead=false;score=0;time=900;found=0;photos=0;shot=0;
+  p={x:50,y:50}; m={x:80,y:20};
+  Object.entries(positions).forEach(([id,[x,y]])=>{objs[id]=true; const e=$(id);e.style.left=x+'%';e.style.top=y+'%';e.style.display='block'});
+  $('monster').style.display='none'; update();
+}
+function update(){
+  $('time').textContent=Math.floor(time/60).toString().padStart(2,'0')+':'+Math.floor(time%60).toString().padStart(2,'0');
+  $('score').textContent=score.toLocaleString();
+  const mult=time>600?3:time>300?2:1;
+  $('danger').textContent=mult===1?'🟢 普通　倍率 ×1':mult===2?'🟠 危険　倍率 ×2':'🔴 超危険　倍率 ×3';
+  $('danger').style.background=mult===1?'#163b25':mult===2?'#4b3512':'#4b1515';
+  $('player').style.left=p.x+'%';$('player').style.top=p.y+'%';
+  $('monster').style.left=m.x+'%';$('monster').style.top=m.y+'%';
+}
+function msg(t){$('message').textContent=t;$('message').style.opacity=1;clearTimeout(msg.t);msg.t=setTimeout(()=>$('message').style.opacity=0,1800)}
+function mult(){return time>600?3:time>300?2:1}
+function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function interact(id,base,label){
+ if(!objs[id]) return;
+ const e=$(id), r=e.getBoundingClientRect(), s=station.getBoundingClientRect();
+ const o={x:(r.left-s.left)/s.width*100,y:(r.top-s.top)/s.height*100};
+ if(Math.hypot(p.x-o.x,p.y-o.y)>10){msg('もう少し近づいてください');return}
+ objs[id]=false;e.style.display='none';let pts=base*mult();score+=pts;found++;
+ msg(label+'！ +'+pts+'pt（×'+mult()+'）');update();
+}
+function capture(){
+ if(!running||dead)return;
+ const near=distance(p,m)<20;
+ const flash=$('cameraFlash');flash.style.opacity=.85;setTimeout(()=>flash.style.opacity=0,80);
+ if(near && $('monster').style.display!=='none'){
+   let pts=500*mult();score+=pts;photos++;msg('👹 化け物を撮影！ +'+pts+'pt');shot++;m.x=Math.min(90,m.x+12);m.y=Math.min(90,m.y+8);update();
+ }else if(Math.random()<.45){let pts=150*mult();score+=pts;photos++;msg('📷 写真対象を記録！ +'+pts+'pt');update()}
+ else msg('📷 撮影したが、有効な記録ではない…');
+}
+function die(){dead=true;running=false;score=0;$('resultTitle').textContent='💀 調査失敗';$('finalScore').textContent='0 pt';$('stats').innerHTML='化け物に捕まった。今回のポイントはすべて失われました。';$('result').classList.remove('hidden')}
+function finish(){
+ if(!running||dead)return;
+ const ex={x:50,y:87};if(Math.hypot(p.x-ex.x,p.y-ex.y)>13){msg('🚇 脱出地点まで戻ってください');return}
+ if(time<20){msg('脱出操作に時間が必要です！');return}
+ running=false;$('resultTitle').textContent='🏆 生還！';$('finalScore').textContent=score.toLocaleString()+' pt';
+ $('stats').innerHTML=`発見した調査対象：${found}件<br>写真・撮影記録：${photos}件<br>生還：✅`;
+ $('result').classList.remove('hidden');
+}
+function tick(t){
+ if(!running)return;
+ if(!last)last=t;let dt=(t-last)/1000;last=t;time-=dt;
+ if(time<=0){time=0;update();die();return}
+ const speed=time>600?.035:time>300?.055:.08;
+ const dx=p.x-m.x,dy=p.y-m.y,d=Math.hypot(dx,dy);
+ if(time<650)$('monster').style.display='block';
+ if(d<24){m.x+=dx/d*speed*12;m.y+=dy/d*speed*12}
+ if(d<4.5)die();
+ update();requestAnimationFrame(tick);
+}
+function move(dx,dy){
+ if(!running||dead)return;
+ const len=Math.hypot(dx,dy)||1;p.x=Math.max(3,Math.min(97,p.x+dx/len*2));p.y=Math.max(4,Math.min(94,p.y+dy/len*2));
+ update();
+}
+document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>({up:()=>move(0,-1),down:()=>move(0,1),left:()=>move(-1,0),right:()=>move(1,0)}[b.dataset.k])());
+document.addEventListener('keydown',e=>{if(e.key==='w'||e.key==='ArrowUp')move(0,-1);if(e.key==='s'||e.key==='ArrowDown')move(0,1);if(e.key==='a'||e.key==='ArrowLeft')move(-1,0);if(e.key==='d'||e.key==='ArrowRight')move(1,0);if(e.code==='Space')capture();if(e.key==='e')finish()});
+$('shoot').onclick=capture;$('escape').onclick=finish;
+$('startBtn').onclick=()=>{reset();$('start').classList.add('hidden');running=true;last=0;requestAnimationFrame(tick);msg('調査開始。まず周囲を調べよう。')};
+$('retry').onclick=()=>{$('result').classList.add('hidden');reset();running=true;last=0;requestAnimationFrame(tick);msg('再調査開始。今回はもっと稼げるか？')};
+reset();
+$('part').onclick=()=>interact('part',50,'🔧 部品を発見');
+$('anomaly').onclick=()=>interact('anomaly',100,'⚠️ 異常を記録');
+$('photo').onclick=()=>interact('photo',150,'📷 写真対象を発見');
+$('phenomenon').onclick=()=>interact('phenomenon',250,'👁️ 現象を記録');
+</script>
+</body>
+</html>
