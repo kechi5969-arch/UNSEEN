@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>UNSEEN — Online Horror Survival</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#030405;color:#e8f0f4;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+canvas{display:block}
+
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5;display:none}
+#title{position:absolute;top:14px;left:16px;font-weight:900;letter-spacing:.22em;font-size:13px}
+#station{position:absolute;top:38px;left:16px;color:#aebcc4;font-size:11px}
+#objective{position:absolute;left:16px;top:70px;max-width:330px;padding:9px 11px;border:1px solid #ffffff22;border-radius:9px;background:#05090dcc;font-size:12px}
+#hint{position:absolute;right:14px;top:14px;color:#aeb8bf;font-size:10px;text-align:right}
+#crosshair{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:#dff7ff;border-radius:50%;box-shadow:0 0 8px #9fe7ff}
+#message{position:absolute;left:50%;bottom:17%;transform:translateX(-50%);width:min(88vw,520px);text-align:center;padding:12px 16px;border-radius:10px;background:#020405d9;border:1px solid #ffffff1a;font-size:13px;opacity:0;transition:opacity .25s}
+#message.show{opacity:1}
+#danger{position:absolute;inset:0;background:#ff001010;box-shadow:inset 0 0 110px #f001;opacity:0;transition:opacity .2s}
+
+#touch{position:fixed;inset:0;z-index:10;pointer-events:none;display:none}
+#stick{position:absolute;left:20px;bottom:28px;width:128px;height:128px;border:1px solid #ffffff24;border-radius:50%;background:#ffffff08;pointer-events:auto;touch-action:none}
+#knob{position:absolute;left:39px;top:39px;width:50px;height:50px;border-radius:50%;background:#dff8ff18;border:1px solid #dff8ff55}
+#look{position:absolute;right:0;top:0;width:58%;height:100%;pointer-events:auto;touch-action:none}
+#interact,#flashBtn{position:absolute;border-radius:50%;border:1px solid #bcefff55;background:#081117bb;color:#dff8ff;pointer-events:auto;touch-action:manipulation}
+#interact{right:22px;bottom:42px;width:70px;height:70px;font-weight:800}
+#flashBtn{right:104px;bottom:52px;width:50px;height:50px}
+
+#mainMenu{
+  position:fixed;inset:0;z-index:40;
+  display:flex;align-items:center;
+  background:
+    linear-gradient(105deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.35) 45%, rgba(0,0,0,.6) 100%),
+    radial-gradient(ellipse at 70% 40%, #1a2a35 0%, #050608 70%);
+  overflow:hidden;
+}
+#mainMenu::before{
+  content:"";position:absolute;inset:0;
+  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;
+}
+.menuLeft{position:relative;z-index:2;padding:clamp(28px,6vw,70px);width:min(480px,92vw)}
+.gameLogo{
+  font-size:clamp(48px,10vw,92px);font-weight:950;letter-spacing:.18em;
+  color:#eef8ff;text-shadow:0 0 40px #7ec8ff55,0 0 80px #3a8fcc33;
+  line-height:1;margin-bottom:6px;
+}
+.gameSub{font-size:11px;letter-spacing:.35em;color:#8aa8bc;margin-bottom:36px;font-weight:600}
+.menuList{display:flex;flex-direction:column;gap:10px;width:min(300px,85vw)}
+.mBtn{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 18px;border:1px solid #ffffff18;border-radius:6px;
+  background:rgba(8,16,22,.75);color:#e4f0f8;font-size:14px;font-weight:700;
+  letter-spacing:.12em;cursor:pointer;transition:all .18s;text-align:left;
+}
+.mBtn:hover{background:rgba(20,45,60,.85);border-color:#7ec8ff66;box-shadow:0 0 20px #3a8fcc22}
+.mBtn .ico{width:22px;opacity:.85;font-size:16px}
+.ver{margin-top:28px;font-size:11px;color:#5a6a75;letter-spacing:.08em}
+
+#mapSelect{
+  position:fixed;inset:0;z-index:41;display:none;
+  background:linear-gradient(160deg,#06090d 0%,#0a1218 50%,#05070a 100%);
+  padding:clamp(20px,4vw,48px);overflow:auto;
+}
+.mapHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+.mapHeader h2{font-size:15px;letter-spacing:.2em;color:#9ab4c4;font-weight:700}
+.mapBack{
+  background:none;border:1px solid #ffffff22;color:#9ab4c4;padding:8px 16px;
+  border-radius:6px;cursor:pointer;font-size:12px;letter-spacing:.1em;
+}
+.mapBack:hover{border-color:#7ec8ff66;color:#c8e4f4}
+.mapGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;max-width:1100px;margin:0 auto}
+.mapCard{
+  border:1px solid #ffffff15;border-radius:12px;overflow:hidden;
+  background:#0a1218;cursor:pointer;transition:all .22s;display:flex;flex-direction:column;
+}
+.mapCard:hover{border-color:#5aa8d088;transform:translateY(-3px);box-shadow:0 12px 40px #00000088}
+.mapCard .thumb{
+  height:160px;background-size:cover;background-position:center;position:relative;
+}
+.mapCard .thumb::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(to top, #0a1218 0%, transparent 55%);
+}
+.mapCard.subway .thumb{background:linear-gradient(135deg,#1a0a10,#0a1520),radial-gradient(ellipse at 30% 70%,#4a1020 0%,transparent 60%)}
+.mapCard.forest .thumb{background:linear-gradient(135deg,#0a1a10,#061210),radial-gradient(ellipse at 50% 40%,#1a3a28 0%,transparent 55%)}
+.mapCard.ocean .thumb{background:linear-gradient(135deg,#061520,#040a12),radial-gradient(ellipse at 70% 30%,#0a3050 0%,transparent 50%)}
+.mapCard .body{padding:16px 18px 18px;flex:1;display:flex;flex-direction:column}
+.mapCard h3{font-size:18px;letter-spacing:.08em;margin-bottom:6px;font-weight:800}
+.mapCard p{font-size:12px;color:#8aa0b0;line-height:1.55;flex:1;margin-bottom:14px}
+.mapCard .selectBtn{
+  width:100%;padding:11px;border:1px solid #ffffff25;border-radius:6px;
+  background:rgba(15,30,42,.8);color:#d0e8f4;font-weight:700;font-size:13px;
+  letter-spacing:.12em;cursor:pointer;transition:all .15s;
+}
+.mapCard.subway .selectBtn{border-color:#c0405066}
+.mapCard.subway .selectBtn:hover{background:#3a1520;border-color:#e06070}
+.mapCard.forest .selectBtn{border-color:#40a06066}
+.mapCard.forest .selectBtn:hover{background:#152a1a;border-color:#60d080}
+.mapCard.ocean .selectBtn{border-color:#3080c066}
+.mapCard.ocean .selectBtn:hover{background:#0a2035;border-color:#50a0e0}
+.mapCard.locked{opacity:.55;pointer-events:none}
+.mapCard.locked .selectBtn{opacity:.6}
+
+#mapDetail{
+  position:fixed;inset:0;z-index:42;display:none;
+  background:#06090d;padding:clamp(16px,3vw,40px);overflow:auto;
+}
+.detailInner{max-width:900px;margin:0 auto}
+.detailTop{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:24px}
+.detailImg{
+  width:min(420px,100%);height:240px;border-radius:10px;
+  background-size:cover;background-position:center;border:1px solid #ffffff12;
+}
+.detailImg.subway{background:linear-gradient(135deg,#2a1018,#0a1520 60%)}
+.detailImg.forest{background:linear-gradient(135deg,#0a1a12,#061210 60%)}
+.detailImg.ocean{background:linear-gradient(135deg,#061820,#040a12 60%)}
+.detailInfo{flex:1;min-width:240px}
+.detailInfo h2{font-size:28px;letter-spacing:.1em;margin-bottom:10px;font-weight:900}
+.detailInfo .desc{font-size:13px;color:#9ab0c0;line-height:1.65;margin-bottom:16px}
+.detailInfo .features{list-style:none;margin-bottom:20px}
+.detailInfo .features li{
+  font-size:12px;color:#b0c4d0;padding:5px 0 5px 14px;position:relative;
+}
+.detailInfo .features li::before{content:"•";position:absolute;left:0;color:#6a9ab0}
+.detailActions{display:flex;gap:12px;flex-wrap:wrap}
+.detailActions button{
+  padding:12px 22px;border-radius:6px;font-weight:700;font-size:13px;
+  letter-spacing:.1em;cursor:pointer;border:1px solid #ffffff25;
+}
+.btnBack{background:transparent;color:#9ab4c4}
+.btnBack:hover{border-color:#7ec8ff66;color:#c8e4f4}
+.btnPlay{background:#0c2030;color:#e0f0fa;border-color:#4a90c0}
+.btnPlay:hover{background:#153545;border-color:#70b0e0}
+.btnPlay.disabled{opacity:.4;pointer-events:none}
+
+#settingsPanel,#creditsPanel{
+  position:fixed;inset:0;z-index:43;display:none;
+  background:rgba(4,6,8,.94);padding:clamp(24px,5vw,60px);
+  align-items:center;justify-content:center;
+}
+.panelBox{
+  width:min(440px,92vw);padding:28px;border:1px solid #ffffff18;
+  border-radius:12px;background:#0a1218;
+}
+.panelBox h2{letter-spacing:.16em;margin-bottom:22px;font-size:16px}
+.setting{margin:18px 0}
+.setting label{display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:#a0b4c0}
+.setting input{width:100%;accent-color:#5a9ec0}
+.panelBox .back{margin-top:20px;background:none;border:0;color:#8aa0b0;cursor:pointer;font-size:13px}
+.creditsText{font-size:13px;color:#9ab0c0;line-height:1.8}
+
+@media(min-width:800px){#stick,#look,#interact,#flashBtn{display:none!important}}
+</style>
+</head>
+<body>
+
+<div id="mainMenu">
+  <div class="menuLeft">
+    <div class="gameLogo">UNSEEN</div>
+    <div class="gameSub">ONLINE HORROR SURVIVAL</div>
+    <div class="menuList">
+      <button class="mBtn" id="btnStart"><span class="ico">▶</span> ゲーム開始</button>
+      <button class="mBtn" id="btnSettings"><span class="ico">⚙</span> 設定</button>
+      <button class="mBtn" id="btnCredits"><span class="ico">☰</span> クレジット</button>
+      <button class="mBtn" id="btnExit"><span class="ico">✕</span> ゲーム終了</button>
+    </div>
+    <div class="ver">Ver. 0.2.0 — PROTOTYPE</div>
+  </div>
+</div>
+
+<div id="mapSelect">
+  <div class="mapHeader">
+    <h2>マップ選択 — 調査する場所を選んでください</h2>
+    <button class="mapBack" id="mapSelectBack">← 戻る</button>
+  </div>
+  <div class="mapGrid">
+    <div class="mapCard subway" data-map="subway">
+      <div class="thumb"></div>
+      <div class="body">
+        <h3>地下鉄</h3>
+        <p>存在しないはずの駅。<br>乗客の中に、人間ではないものがいる。</p>
+        <button class="selectBtn">選択</button>
+      </div>
+    </div>
+    <div class="mapCard forest locked" data-map="forest">
+      <div class="thumb"></div>
+      <div class="body">
+        <h3>森林</h3>
+        <p>広大な森林。<br>離れれば離れるほど、何かが近づいてくる。</p>
+        <button class="selectBtn">準備中</button>
+      </div>
+    </div>
+    <div class="mapCard ocean locked" data-map="ocean">
+      <div class="thumb"></div>
+      <div class="body">
+        <h3>海底施設</h3>
+        <p>海底に残された研究施設。<br>窓の外から、何かがこちらを見ている。</p>
+        <button class="selectBtn">準備中</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="mapDetail">
+  <div class="detailInner">
+    <div class="detailTop">
+      <div class="detailImg subway" id="detailImg"></div>
+      <div class="detailInfo">
+        <h2 id="detailTitle">地下鉄</h2>
+        <p class="desc" id="detailDesc">存在しないはずの駅。乗客の中に、人間ではないものがいる。</p>
+        <ul class="features" id="detailFeatures">
+          <li>乗客に紛れた異常な存在</li>
+          <li>線路上の怪異</li>
+          <li>電車の中での緊張感</li>
+        </ul>
+        <div class="detailActions">
+          <button class="btnBack" id="detailBack">← 戻る</button>
+          <button class="btnPlay" id="detailPlay">マップを選択</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="settingsPanel">
+  <div class="panelBox">
+    <h2>設定</h2>
+    <div class="setting">
+      <label>感度 <span id="sensVal">1.0</span></label>
+      <input id="sens" type="range" min=".4" max="2" step=".1" value="1">
+    </div>
+    <div class="setting">
+      <label>明るさ <span id="brightVal">1.0</span></label>
+      <input id="bright" type="range" min=".5" max="1.5" step=".1" value="1">
+    </div>
+    <button class="back" id="settingsBack">← 戻る</button>
+  </div>
+</div>
+
+<div id="creditsPanel">
+  <div class="panelBox">
+    <h2>クレジット</h2>
+    <div class="creditsText">
+      UNSEEN — Online Horror Survival<br><br>
+      Prototype Development<br>
+      Concept & Design<br><br>
+      Powered by Three.js
+    </div>
+    <button class="back" id="creditsBack">← 戻る</button>
+  </div>
+</div>
+
+<div id="hud">
+  <div id="title">UNSEEN</div>
+  <div id="station">地下鉄 / 第零駅</div>
+  <div id="objective">目的：ホームを調査する</div>
+  <div id="hint">PC: WASD / マウス　　iPhone: 左スティック / 右側ドラッグ</div>
+  <div id="crosshair"></div>
+  <div id="danger"></div>
+  <div id="message"></div>
+</div>
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <div id="look"></div>
+  <button id="flashBtn">LIGHT</button>
+  <button id="interact">調査</button>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+
+const mainMenu = document.getElementById('mainMenu');
+const mapSelect = document.getElementById('mapSelect');
+const mapDetail = document.getElementById('mapDetail');
+const settingsPanel = document.getElementById('settingsPanel');
+const creditsPanel = document.getElementById('creditsPanel');
+const hud = document.getElementById('hud');
+const touch = document.getElementById('touch');
+
+function show(el){ el.style.display = (el === settingsPanel || el === creditsPanel) ? 'flex' : 'block'; }
+function hide(el){ el.style.display = 'none'; }
+
+document.getElementById('btnStart').onclick = () => { hide(mainMenu); show(mapSelect); };
+document.getElementById('btnSettings').onclick = () => show(settingsPanel);
+document.getElementById('btnCredits').onclick = () => show(creditsPanel);
+document.getElementById('btnExit').onclick = () => { if(confirm('ゲームを終了しますか？')) location.reload(); };
+
+document.getElementById('mapSelectBack').onclick = () => { hide(mapSelect); show(mainMenu); };
+document.getElementById('settingsBack').onclick = () => hide(settingsPanel);
+document.getElementById('creditsBack').onclick = () => hide(creditsPanel);
+
+const mapData = {
+  subway: {
+    title: '地下鉄',
+    desc: '存在しないはずの駅。乗客の中に、人間ではないものがいる。',
+    features: ['乗客に紛れた異常な存在', '線路上の怪異', '電車の中での緊張感'],
+    playable: true
+  },
+  forest: {
+    title: '森林',
+    desc: '広大な森林。離れれば離れるほど、何かが近づいてくる。',
+    features: ['足跡や草の揺れなどの痕跡', '遠くから聞こえる鳴き声', '仲間との距離が重要'],
+    playable: false
+  },
+  ocean: {
+    title: '海底施設',
+    desc: '海底に残された研究施設。窓の外から、何かがこちらを見ている。',
+    features: ['水の侵入による環境変化', '窓の外の未知の存在', '閉鎖空間での緊張感'],
+    playable: false
+  }
+};
+
+document.querySelectorAll('.mapCard').forEach(card => {
+  card.onclick = () => {
+    if (card.classList.contains('locked')) return;
+    const key = card.dataset.map;
+    const d = mapData[key];
+    document.getElementById('detailTitle').textContent = d.title;
+    document.getElementById('detailDesc').textContent = d.desc;
+    document.getElementById('detailFeatures').innerHTML = d.features.map(f => '<li>'+f+'</li>').join('');
+    const img = document.getElementById('detailImg');
+    img.className = 'detailImg ' + key;
+    const playBtn = document.getElementById('detailPlay');
+    playBtn.classList.toggle('disabled', !d.playable);
+    playBtn.textContent = d.playable ? 'マップを選択' : '準備中';
+    playBtn.dataset.map = key;
+    hide(mapSelect);
+    show(mapDetail);
+  };
+});
+
+document.getElementById('detailBack').onclick = () => { hide(mapDetail); show(mapSelect); };
+document.getElementById('detailPlay').onclick = (e) => {
+  if (e.target.classList.contains('disabled')) return;
+  hide(mapDetail);
+  startGame(e.target.dataset.map || 'subway');
+};
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030506);
+scene.fog = new THREE.FogExp2(0x030506, 0.028);
+
+const camera = new THREE.PerspectiveCamera(74, innerWidth / innerHeight, 0.05, 220);
+camera.position.set(0, 1.72, 14);
+camera.rotation.order = 'YXZ';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const world = new THREE.Group();
+scene.add(world);
+
+const M = {
+  floor: new THREE.MeshStandardMaterial({ color: 0x3a3f42, roughness: 0.92 }),
+  floorDark: new THREE.MeshStandardMaterial({ color: 0x2a2e31, roughness: 0.95 }),
+  wall: new THREE.MeshStandardMaterial({ color: 0x4a5256, roughness: 0.78 }),
+  tile: new THREE.MeshStandardMaterial({ color: 0xc8d0d4, roughness: 0.55 }),
+  tileDark: new THREE.MeshStandardMaterial({ color: 0x8a9499, roughness: 0.65 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x111517, roughness: 0.95 }),
+  metal: new THREE.MeshStandardMaterial({ color: 0x5a6368, roughness: 0.35, metalness: 0.75 }),
+  train: new THREE.MeshStandardMaterial({ color: 0x6a7278, roughness: 0.28, metalness: 0.85 }),
+  trainDark: new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.4, metalness: 0.7 }),
+  yellow: new THREE.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.55 }),
+  white: new THREE.MeshStandardMaterial({ color: 0xe8eef0, roughness: 0.5 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x080a0b, roughness: 1 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x9ed8df, roughness: 0.12, metalness: 0.15, transparent: true, opacity: 0.28 }),
+  glassDark: new THREE.MeshStandardMaterial({ color: 0x1a2830, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.55 }),
+  ad: new THREE.MeshStandardMaterial({ color: 0x182a31, roughness: 0.65 }),
+  red: new THREE.MeshStandardMaterial({ color: 0x9d1c22, roughness: 0.7 }),
+  bench: new THREE.MeshStandardMaterial({ color: 0x5c4030, roughness: 0.75 }),
+  seat: new THREE.MeshStandardMaterial({ color: 0x2a5a6a, roughness: 0.6 })
+};
+
+function box(n, x, y, z, sx, sy, sz, m, cast = false) {
+  const q = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m);
+  q.name = n; q.position.set(x, y, z); q.castShadow = cast; q.receiveShadow = true;
+  world.add(q); return q;
+}
+function cyl(n, x, y, z, r, h, m, segs = 16) {
+  const q = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, segs), m);
+  q.name = n; q.position.set(x, y, z); q.castShadow = true; q.receiveShadow = true;
+  world.add(q); return q;
+}
+function sprite(text, scale = 1) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(5,10,12,.92)'; x.fillRect(0, 0, 512, 128);
+  x.fillStyle = '#e8fbff'; x.font = 'bold 40px sans-serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 256, 64);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+  s.scale.set(3.2 * scale, 0.8 * scale, 1); return s;
+}
+
+box('platform', 2.5, 0, -30, 13, 0.45, 100, M.floor);
+box('platformEdge', -3.2, 0.05, -30, 1.4, 0.12, 100, M.floorDark);
+box('backWall', 2.5, 4.2, -30, 13, 8, 100, M.wall);
+box('ceiling', 2.5, 8.4, -30, 13, 0.4, 100, M.dark);
+// 線路側は壁を置かない（電車が見えるように）
+// 端の安全柵だけ簡易的に
+for (let z = 14; z > -80; z -= 4) {
+  box('fencePost', -3.6, 0.7, z, 0.08, 1.2, 0.08, M.metal);
+}
+box('fenceRail', -3.6, 1.15, -30, 0.05, 0.06, 96, M.metal);
+box('rightWall', 9, 4.2, -30, 0.5, 8, 100, M.dark);
+
+box('trackBed', -6.5, -0.55, -30, 6.5, 0.5, 100, M.black);
+for (const x of [-7.8, -5.2]) {
+  box('rail', x, -0.22, -30, 0.12, 0.14, 100, M.metal);
+  box('railBase', x, -0.32, -30, 0.32, 0.08, 100, M.metal);
+}
+for (let z = 15; z > -85; z -= 2.1) box('sleeper', -6.5, -0.42, z, 4.8, 0.14, 0.22, M.dark);
+
+box('yellowLine', -3.0, 0.28, -30, 0.28, 0.04, 100, M.yellow);
+for (let z = 16; z > -85; z -= 0.65) box('tactile', -3.0, 0.30, z, 0.55, 0.06, 0.38, M.yellow);
+
+for (let z = 10; z > -80; z -= 9) {
+  cyl('column', 5.5, 4.0, z, 0.55, 7.9, M.tile, 20);
+  box('columnBand', 5.5, 0.35, z, 1.3, 0.4, 1.3, M.tileDark);
+  box('columnBand2', 5.5, 7.6, z, 1.3, 0.25, 1.3, M.tileDark);
+}
+
+for (let z = 12; z > -82; z -= 7) {
+  box('lamp', 2.5, 8.15, z, 4.5, 0.12, 0.4, M.white);
+  const l = new THREE.PointLight(0xdceeff, 1.15, 14, 2);
+  l.position.set(2.5, 7.7, z); world.add(l);
+}
+
+for (let z = 14; z > -84; z -= 3.8)
+  for (let y = 1.2; y < 7.5; y += 1.2)
+    box('tileR', 8.7, y, z, 0.08, 1.1, 3.5, M.tile);
+
+for (let z = 8; z > -78; z -= 20) {
+  const s = sprite('第零駅  ZERO STATION', 1.1);
+  s.position.set(2.5, 6.4, z); world.add(s);
+}
+
+for (const z of [4, -18, -42, -64]) {
+  box('benchSeat', 6.8, 0.95, z, 0.55, 0.18, 2.8, M.bench);
+  box('benchBack', 7.15, 1.55, z, 0.12, 1.0, 2.8, M.bench);
+  for (const zz of [z - 1.1, z + 1.1]) cyl('benchLeg', 6.8, 0.5, zz, 0.07, 0.9, M.metal);
+}
+
+for (const z of [-8, -48]) {
+  box('vending', 8.2, 1.7, z, 0.7, 2.8, 1.1, M.ad, true);
+  box('vendingGlow', 7.85, 1.9, z, 0.04, 1.4, 0.7, M.glass);
+}
+
+for (const z of [-2, -28, -55]) {
+  box('ad', 8.7, 3.4, z, 0.1, 1.7, 2.6, M.ad);
+  const a = sprite(z === -28 ? '帰り道を忘れないで' : 'あなたは今、どこにいる？', 0.7);
+  a.position.set(8.55, 3.4, z); a.rotation.y = -Math.PI / 2; world.add(a);
+}
+box('mapBoard', 8.7, 4.9, -14, 0.1, 1.5, 2.4, M.black);
+const mt = sprite('LINE 00 / 01 / 02', 0.65);
+mt.position.set(8.55, 4.9, -14); mt.rotation.y = -Math.PI / 2; world.add(mt);
+
+for (const z of [-6, -36, -66]) {
+  box('emergency', 8.55, 1.7, z, 0.2, 1.4, 0.9, M.red);
+  const t = sprite('非常口', 0.45);
+  t.position.set(8.4, 1.75, z); t.rotation.y = -Math.PI / 2; world.add(t);
+}
+
+box('tunnelTop', -3, 5.5, -82, 14, 5, 1.2, M.black);
+box('tunnelL', -9.5, 2.5, -82, 1.5, 6, 1.2, M.black);
+box('tunnelR', 4, 2.5, -82, 1.5, 6, 1.2, M.black);
+
+function createTrain(len, openDoor) {
+  const train = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 3.2, len), M.train);
+  body.position.set(0, 1.7, 0); body.castShadow = true; train.add(body);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.25, len + 0.2), M.trainDark);
+  roof.position.set(0, 3.35, 0); train.add(roof);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.35, len - 0.5), M.white);
+  stripe.position.set(1.72, 1.4, 0); train.add(stripe);
+  const winCount = Math.floor(len / 2.2);
+  for (let i = -Math.floor(winCount/2); i <= Math.floor(winCount/2); i++) {
+    if (i === 0 && openDoor) continue;
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.15, 1.5), M.glassDark);
+    win.position.set(1.72, 2.15, i * 2.15); train.add(win);
+  }
+  if (openDoor) {
+    const doorOpen = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.3, 1.5), M.trainDark);
+    doorOpen.position.set(1.75, 1.35, 0); train.add(doorOpen);
+    const doorFloor = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 1.4), M.floorDark);
+    doorFloor.position.set(1.0, 0.15, 0); train.add(doorFloor);
+    for (const side of [-0.55, 0.55]) {
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 1.1), M.seat);
+      seat.position.set(0.3, 0.85, side); train.add(seat);
+      const seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 1.1), M.seat);
+      seatBack.position.set(-0.05, 1.3, side); train.add(seatBack);
+    }
+  }
+  train.position.set(-6.5, 0, 0);
+  world.add(train);
+  return train;
+}
+
+// 電車ループ: 進入 → 停車 → 発車
+const trainA = createTrain(22, true);
+const trainB = createTrain(18, false);
+trainB.position.z = -40;
+
+const trainState = {
+  phase: 'approach',   // approach | stop | depart | wait
+  timer: 0,
+  stopDuration: 9,
+  waitDuration: 10,
+  speed: 7.5,
+  stopZ: -8,
+  startZ: -88,
+  endZ: 40
+};
+trainA.position.z = trainState.startZ;
+
+
+scene.add(new THREE.HemisphereLight(0x9fb4c0, 0x020304, 0.5));
+const moon = new THREE.DirectionalLight(0xa8c7d6, 0.4);
+moon.position.set(-12, 18, 8); moon.castShadow = true; scene.add(moon);
+
+const flash = new THREE.SpotLight(0xdff6ff, 8, 30, Math.PI / 8, 0.45, 1.3);
+scene.add(flash); scene.add(flash.target);
+let lightOn = true;
+
+const keys = {}, player = { speed: 4.2 };
+let yaw = 0, pitch = 0, sensitivity = 1, brightness = 1, started = false;
+
+function move(dx, dz) {
+  camera.position.x = Math.max(-2.6, Math.min(8.2, camera.position.x + dx));
+  camera.position.z = Math.max(-78, Math.min(16, camera.position.z + dz));
+}
+
+const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+let joy = { x: 0, y: 0 }, joyId = null;
+stick.onpointerdown = e => { joyId = e.pointerId; stick.setPointerCapture(e.pointerId); };
+stick.onpointermove = e => {
+  if (e.pointerId !== joyId) return;
+  const r = stick.getBoundingClientRect();
+  const x = (e.clientX - (r.left + r.width / 2)) / 48;
+  const y = (e.clientY - (r.top + r.height / 2)) / 48;
+  const l = Math.hypot(x, y), k = Math.max(1, l);
+  joy = { x: x / k, y: y / k };
+  knob.style.transform = 'translate('+ (joy.x*32) +'px,'+ (joy.y*32) +'px)';
+};
+stick.onpointerup = () => { joy = { x: 0, y: 0 }; knob.style.transform = ''; joyId = null; };
+
+const look = document.getElementById('look');
+let lookId = null, lx = 0, ly = 0;
+look.onpointerdown = e => { lookId = e.pointerId; lx = e.clientX; ly = e.clientY; look.setPointerCapture(e.pointerId); };
+look.onpointermove = e => {
+  if (e.pointerId !== lookId) return;
+  yaw -= (e.clientX - lx) * 0.0045 * sensitivity;
+  pitch -= (e.clientY - ly) * 0.0035 * sensitivity;
+  lx = e.clientX; ly = e.clientY;
+  pitch = Math.max(-1.35, Math.min(1.35, pitch));
+  camera.rotation.set(pitch, yaw, 0);
+};
+look.onpointerup = () => lookId = null;
+
+function say(t) {
+  const m = document.getElementById('message');
+  m.textContent = t; m.classList.add('show');
+  clearTimeout(say.t); say.t = setTimeout(() => m.classList.remove('show'), 2600);
+}
+
+document.getElementById('interact').onclick = () => {
+  const z = camera.position.z;
+  if (z < -70) say('トンネルの奥から、列車ではない音がする。');
+  else if (z < -50) say('掲示板の文字が変わった。「ここから先は駅ではない」');
+  else if (z < -30) say('電源が切れているはずの自販機が動いている。');
+  else if (z < -5) say('開いたドアの奥に、誰かの気配がする。');
+  else say('普通の地下鉄ホームに見える。今は。');
+};
+document.getElementById('flashBtn').onclick = () => { lightOn = !lightOn; flash.intensity = lightOn ? 8 : 0; };
+
+addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === 'f' || e.key === 'F') { lightOn = !lightOn; flash.intensity = lightOn ? 8 : 0; }
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+document.getElementById('sens').oninput = e => {
+  sensitivity = +e.target.value;
+  document.getElementById('sensVal').textContent = sensitivity.toFixed(1);
+};
+document.getElementById('bright').oninput = e => {
+  brightness = +e.target.value;
+  document.getElementById('brightVal').textContent = brightness.toFixed(1);
+  renderer.toneMappingExposure = 1.05 * brightness;
+};
+
+renderer.domElement.onclick = () => {
+  if (started && innerWidth > 800) renderer.domElement.requestPointerLock?.();
+};
+addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== renderer.domElement) return;
+  yaw -= e.movementX * 0.0025 * sensitivity;
+  pitch -= e.movementY * 0.002 * sensitivity;
+  pitch = Math.max(-1.35, Math.min(1.35, pitch));
+  camera.rotation.set(pitch, yaw, 0);
+});
+
+function startGame(map) {
+  started = true;
+  hud.style.display = 'block';
+  touch.style.display = 'block';
+  document.getElementById('station').textContent = map === 'subway' ? '地下鉄 / 第零駅' : map;
+  document.getElementById('objective').textContent = '目的：ホームを調査する';
+  say('ZERO STATION — 調査開始');
+  if (innerWidth > 800) renderer.domElement.requestPointerLock?.();
+}
+
+let last = performance.now(), eventDone = false, eventTime = 0;
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.035, (now - last) / 1000);
+  last = now;
+  // 電車ループ更新
+  trainState.timer += dt;
+  if (trainState.phase === 'approach') {
+    trainA.position.z += trainState.speed * dt;
+    if (trainA.position.z >= trainState.stopZ) {
+      trainA.position.z = trainState.stopZ;
+      trainState.phase = 'stop';
+      trainState.timer = 0;
+      if (started) say('電車がホームに到着した……');
+    }
+  } else if (trainState.phase === 'stop') {
+    if (trainState.timer >= trainState.stopDuration) {
+      trainState.phase = 'depart';
+      trainState.timer = 0;
+      if (started) say('電車が動き出した。');
+    }
+  } else if (trainState.phase === 'depart') {
+    trainA.position.z += trainState.speed * 1.15 * dt;
+    if (trainA.position.z >= trainState.endZ) {
+      trainA.position.z = trainState.startZ;
+      trainState.phase = 'wait';
+      trainState.timer = 0;
+    }
+  } else if (trainState.phase === 'wait') {
+    if (trainState.timer >= trainState.waitDuration) {
+      trainState.phase = 'approach';
+      trainState.timer = 0;
+    }
+  }
+  // 2両目は少し遅れて追従（簡易）
+  trainB.position.z = trainA.position.z - 28;
+
+  if (started) {
+    let f = 0, s = 0;
+    if (keys.w || keys.arrowup) f++;
+    if (keys.s || keys.arrowdown) f--;
+    if (keys.a || keys.arrowleft) s--;
+    if (keys.d || keys.arrowright) s++;
+    f -= joy.y; s += joy.x;
+    const l = Math.hypot(f, s);
+    if (l > 1) { f /= l; s /= l; }
+    const d = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const q = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    move((d.x * f + q.x * s) * player.speed * dt, (d.z * f + q.z * s) * player.speed * dt);
+    flash.position.copy(camera.position);
+    flash.target.position.set(
+      camera.position.x - Math.sin(yaw) * 5,
+      camera.position.y + Math.sin(pitch) * 5,
+      camera.position.z - Math.cos(yaw) * 5
+    );
+    eventTime += dt;
+    if (!eventDone && camera.position.z < -45 && eventTime > 6) {
+      eventDone = true;
+      document.getElementById('objective').textContent = '目的：さっきの広告をもう一度確認する';
+      say('……後ろで足音がした。');
+      document.getElementById('danger').style.opacity = '.45';
+      setTimeout(() => document.getElementById('danger').style.opacity = '0', 900);
+    }
+  }
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(loop);
+</script>
+</body></html>
